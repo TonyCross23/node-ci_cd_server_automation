@@ -9,6 +9,6 @@ export default defineConfig({
     path: "prisma/migrations",
   },
   datasource: {
-    url: process.env["DATABASE_URL"],
+    url: process.env["DATABASE_URL"] || "postgresql://postgres:postgres@172.28.0.10:5432/express_swagger_crud?schema=public",
   },
 });
