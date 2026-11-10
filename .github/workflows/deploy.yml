@@ -1,0 +1,42 @@
+name: CI/CD Pipeline
+
+on: 
+  push:
+    branches: [ "main" ]
+  
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Setup pnpm
+      uses: pnpm/action-setup@v4
+      with:
+        version: latest
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+        cache: 'pnpm'
+      
+    - name: Install dependencies
+      run: | 
+        pnpm install
+        pnpm build
+
+    - name: Deploy to Remote Server via SSH
+      uses: appleboy/ssh-action@1.0.3
+      with:
+        host: ${{ secrets.SSH_HOST }}
+        username: ${{ secrets.SSH_USERNAME }}
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        script: |
+          cd /home/ubuntu/node-ci_cd_server_automation
+          git pull origin main
+          docker compose down
+          docker compose up -d --build
+          docker system prune -f
