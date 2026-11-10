@@ -1,31 +1,34 @@
-FROM node:20-alpine AS builder
+FROM node:24-bookworm AS base
 
 WORKDIR /app
 
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN npm install --global pnpm@12.18.0
 
-COPY package.json pnpm-lock.yaml ./
-RUN pnpm install --frozen-lockfile --ignore-scripts
+FROM base AS builder
 
-COPY . .
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+RUN pnpm install --frozen-lockfile
 
-RUN npx prisma generate
+COPY tsconfig.json ./
+# Prisma discovers this filename for both generation and migrations.
+COPY prisma7.config.ts ./prisma.config.ts
+COPY prisma ./prisma
+COPY src ./src
+
 RUN pnpm run build
 
-# Production Runner Stage
-FROM node:20-alpine AS runner
+FROM base AS runner
 
-WORKDIR /app
 ENV NODE_ENV=production
 
-RUN corepack enable && corepack prepare pnpm@latest --activate
-
-COPY package.json pnpm-lock.yaml ./
-RUN pnpm install --frozen-lockfile --prod --ignore-scripts
-
+COPY --from=builder /app/package.json /app/pnpm-lock.yaml /app/pnpm-workspace.yaml ./
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
+# The Compose startup command needs the local Prisma CLI and dotenv.
 COPY --from=builder /app/node_modules ./node_modules
+
+USER node
 
 EXPOSE 3000
 
